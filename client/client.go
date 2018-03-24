@@ -88,38 +88,38 @@ func (fbClient footballDataOrgClient) GetTeams() (teams []Team) {
 }
 
 func (fbClient footballDataOrgClient) GetFixtures(teamID int) []Fixture {
-	values := map[string]string{"tid": strconv.Itoa(teamID)}
-	resp, _ := fbClient.sendRequest(fdoEndPoints["Fixtures"], "minified", values)
-	defer resp.Body.Close()
-	body, _ := ioutil.ReadAll(resp.Body)
-
 	var fixtureResponse fdoFixtureResponse
-	json.Unmarshal(body, &fixtureResponse)
+	values := map[string]string{"tid": strconv.Itoa(teamID)}
+	fbClient.makeMinifiedRequest(fdoEndPoints["Fixtures"], values, &fixtureResponse)
 
 	return fixtureResponse.Fixtures
 }
 
 func (fbClient footballDataOrgClient) getCompetitions() []competition {
-	resp, _ := fbClient.sendRequest(fdoEndPoints["Competitions"], "minified", nil)
-	defer resp.Body.Close()
-	body, _ := ioutil.ReadAll(resp.Body)
-
 	competitions := make([]competition, 0)
-	json.Unmarshal(body, &competitions)
+	fbClient.makeMinifiedRequest(fdoEndPoints["Competitions"], nil, &competitions)
 
 	return competitions
 }
 
 func (fbClient footballDataOrgClient) getTeamsInCompetition(competitionID int) []Team {
+	var competitionResponse fdoCompetitionResponse
 	values := map[string]string{"cid": strconv.Itoa(competitionID)}
-	resp, _ := fbClient.sendRequest(fdoEndPoints["Teams"], "minified", values)
+	fbClient.makeMinifiedRequest(fdoEndPoints["Teams"], values, &competitionResponse)
+
+	return competitionResponse.Teams
+}
+
+func (fbClient footballDataOrgClient) makeMinifiedRequest(endPoint string, values map[string]string, unmarshalTo interface{}) {
+	fbClient.makeRequest(endPoint, "minified", values, unmarshalTo)
+}
+
+func (fbClient footballDataOrgClient) makeRequest(endPoint string, responseControl string, values map[string]string, unmarshalTo interface{}) {
+	resp, _ := fbClient.sendRequest(endPoint, responseControl, values)
 	defer resp.Body.Close()
 	body, _ := ioutil.ReadAll(resp.Body)
 
-	var competitionResponse fdoCompetitionResponse
-	json.Unmarshal(body, &competitionResponse)
-
-	return competitionResponse.Teams
+	json.Unmarshal(body, unmarshalTo)
 }
 
 func (fbClient footballDataOrgClient) sendRequest(endPoint string, responseControl string, values map[string]string) (*http.Response, error) {
