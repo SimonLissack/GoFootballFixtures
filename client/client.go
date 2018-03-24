@@ -7,54 +7,37 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	t "time"
 
 	"github.com/simonlissack/footballfixtures/ffconfig"
+	m "github.com/simonlissack/footballfixtures/model"
 )
-
-// Team represents a football team
-type Team struct {
-	ID        int    `json:"id"`
-	Name      string `json:"name"`
-	ShortName string `json:"shortName"`
-}
-
-// Fixture represents a scheduled match between two football teams
-type Fixture struct {
-	Date         t.Time `json:"date"`
-	Status       string `json:"status"`
-	HomeTeamName string `json:"homeTeamName"`
-	HomeTeamID   int    `json:"homeTeamId"`
-	AwayTeamName string `json:"awayTeamName"`
-	AwayTeamID   int    `json:"awayTeamId"`
-}
 
 type competition struct {
 	ID int `json:"id"`
 }
 
 type fdoCompetitionResponse struct {
-	Count int    `json:"count"`
-	Teams []Team `json:"teams"`
+	Count int      `json:"count"`
+	Teams []m.Team `json:"teams"`
 }
 
 type fdoFixtureResponse struct {
-	Count    int       `json:"count"`
-	Fixtures []Fixture `json:"fixtures"`
+	Count    int         `json:"count"`
+	Fixtures []m.Fixture `json:"fixtures"`
 }
 
 // FootballClient is the interface for getting teams and fixtures
 type FootballClient interface {
 	// GetTeams gets all the available teams
-	GetTeams() []Team
+	GetTeams() []m.Team
 	// GetFixtures finds the fixtures in the next 30 days for a team, based on the teamID
-	GetFixtures(teamID int) []Fixture
+	GetFixtures(teamID int) []m.Fixture
 }
 
 // FootballDataOrgClient is a client for football-data.org rest API
 type footballDataOrgClient struct {
 	config ffconfig.FFConfiguration
-	teams  []Team
+	teams  []m.Team
 }
 
 const (
@@ -76,9 +59,9 @@ func NewFootballDataOrgClient(config ffconfig.FFConfiguration) FootballClient {
 	return footballDataOrgClient{config: config}
 }
 
-func (fbClient footballDataOrgClient) GetTeams() (teams []Team) {
+func (fbClient footballDataOrgClient) GetTeams() (teams []m.Team) {
 	competitions := fbClient.getCompetitions()
-	teams = make([]Team, 0)
+	teams = make([]m.Team, 0)
 	for _, competition := range competitions {
 		compTeams := fbClient.getTeamsInCompetition(competition.ID)
 		teams = append(teams, compTeams...)
@@ -87,7 +70,7 @@ func (fbClient footballDataOrgClient) GetTeams() (teams []Team) {
 	return
 }
 
-func (fbClient footballDataOrgClient) GetFixtures(teamID int) []Fixture {
+func (fbClient footballDataOrgClient) GetFixtures(teamID int) []m.Fixture {
 	var fixtureResponse fdoFixtureResponse
 	values := map[string]string{"tid": strconv.Itoa(teamID)}
 	fbClient.makeMinifiedRequest(fdoEndPoints["Fixtures"], values, &fixtureResponse)
@@ -102,7 +85,7 @@ func (fbClient footballDataOrgClient) getCompetitions() []competition {
 	return competitions
 }
 
-func (fbClient footballDataOrgClient) getTeamsInCompetition(competitionID int) []Team {
+func (fbClient footballDataOrgClient) getTeamsInCompetition(competitionID int) []m.Team {
 	var competitionResponse fdoCompetitionResponse
 	values := map[string]string{"cid": strconv.Itoa(competitionID)}
 	fbClient.makeMinifiedRequest(fdoEndPoints["Teams"], values, &competitionResponse)

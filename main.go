@@ -8,11 +8,13 @@ import (
 
 	"github.com/simonlissack/footballfixtures/client"
 	"github.com/simonlissack/footballfixtures/ffconfig"
+	m "github.com/simonlissack/footballfixtures/model"
 )
 
 var (
-	configPath, teamName string
-	teamID               int
+	configPath string
+	teamName   string
+	teamID     int
 )
 
 func init() {
@@ -51,7 +53,7 @@ func main() {
 	printHomeFixtures(fixtures, teamID)
 }
 
-func lookupTeam(teams []client.Team, teamQuery string) (int, error) {
+func lookupTeam(teams []m.Team, teamQuery string) (int, error) {
 	for _, t := range teams {
 		if t.Name == teamQuery || t.ShortName == teamQuery {
 			return t.ID, nil
@@ -62,7 +64,7 @@ func lookupTeam(teams []client.Team, teamQuery string) (int, error) {
 	return -1, err
 }
 
-func printHomeFixtures(fixtures []client.Fixture, teamID int) {
+func printHomeFixtures(fixtures []m.Fixture, teamID int) {
 	for _, f := range fixtures {
 
 		if f.AwayTeamID == teamID {
