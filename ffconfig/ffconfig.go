@@ -6,9 +6,10 @@ import (
 
 // FFConfiguration provides the API key for getting fixtures as well as persistence options
 type FFConfiguration struct {
-	APIKey       string `json:"apiKey"`
-	TeamsFile    string `json:"teamsFile"`
-	PersistTeams bool   `json:"persistTeams"`
+	APIKey           string `json:"apiKey"`
+	TeamsFile        string `json:"teamsFile"`
+	PersistTeams     bool   `json:"persistTeams"`
+	RebuildIfNoTeams bool   `json:"rebuildIfNoTeams"`
 }
 
 // LoadConfig Load the configuration from file

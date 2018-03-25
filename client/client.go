@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/simonlissack/footballfixtures/storage"
+
 	"github.com/simonlissack/footballfixtures/ffconfig"
 	m "github.com/simonlissack/footballfixtures/model"
 )
@@ -29,7 +31,7 @@ type fdoFixtureResponse struct {
 // FootballClient is the interface for getting teams and fixtures
 type FootballClient interface {
 	// GetTeams gets all the available teams
-	GetTeams() []m.Team
+	GetTeams() ([]m.Team, error)
 	// GetFixtures finds the fixtures in the next 30 days for a team, based on the teamID
 	GetFixtures(teamID int) []m.Fixture
 }
@@ -37,6 +39,7 @@ type FootballClient interface {
 // FootballDataOrgClient is a client for football-data.org rest API
 type footballDataOrgClient struct {
 	config ffconfig.FFConfiguration
+	cache  storage.TeamsCacheClient
 	teams  []m.Team
 }
 
@@ -55,16 +58,28 @@ var fdoEndPoints = map[string]string{
 }
 
 // NewFootballDataOrgClient creates a new FootballClient which uses football-data.org API
-func NewFootballDataOrgClient(config ffconfig.FFConfiguration) FootballClient {
-	return footballDataOrgClient{config: config}
+func NewFootballDataOrgClient(config ffconfig.FFConfiguration, cache storage.TeamsCacheClient) FootballClient {
+	return footballDataOrgClient{config: config, cache: cache}
 }
 
-func (fbClient footballDataOrgClient) GetTeams() (teams []m.Team) {
+func (fbClient footballDataOrgClient) GetTeams() (teams []m.Team, err error) {
+	if fbClient.config.PersistTeams && fbClient.cache != nil {
+		teams, err = fbClient.cache.LoadTeams()
+
+		if len(teams) > 0 || !fbClient.config.RebuildIfNoTeams {
+			return
+		}
+	}
+
 	competitions := fbClient.getCompetitions()
 	teams = make([]m.Team, 0)
 	for _, competition := range competitions {
 		compTeams := fbClient.getTeamsInCompetition(competition.ID)
 		teams = append(teams, compTeams...)
+	}
+
+	if fbClient.cache != nil && fbClient.config.PersistTeams {
+		err = fbClient.cache.SaveTeams(teams)
 	}
 
 	return

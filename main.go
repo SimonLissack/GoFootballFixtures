@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"log"
 
+	"github.com/simonlissack/footballfixtures/storage"
+
 	"github.com/simonlissack/footballfixtures/client"
 	"github.com/simonlissack/footballfixtures/ffconfig"
 	m "github.com/simonlissack/footballfixtures/model"
@@ -38,11 +40,12 @@ func main() {
 	logFatal(err)
 	config, err := ffconfig.LoadConfig(configFile)
 	logFatal(err)
+	storage := storage.NewLocalTeamsCache(*config)
 
-	client := client.NewFootballDataOrgClient(*config)
+	client := client.NewFootballDataOrgClient(*config, storage)
 
 	if teamID == -1 {
-		teams := client.GetTeams()
+		teams, _ := client.GetTeams()
 		teamID, err = lookupTeam(teams, teamName)
 		logFatal(err)
 	}
