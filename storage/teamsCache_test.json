@@ -1,0 +1,14 @@
+{
+    "teams": [
+        {
+            "id": 325,
+            "name": "Portsmouth",
+            "shortName": ""
+        },
+        {
+            "id": 361,
+            "name": "Rochdale AFC",
+            "shortName": "Rochdale"
+        }
+    ]
+}
