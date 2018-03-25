@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/simonlissack/footballfixtures/storage"
 
@@ -34,20 +35,30 @@ type FootballClient interface {
 	GetTeams() ([]m.Team, error)
 	// GetFixtures finds the fixtures in the next 30 days for a team, based on the teamID
 	GetFixtures(teamID int) []m.Fixture
+	// CanMakeRequest checks if the client can make a request, returning an error if the user if being throttled
+	CanMakeRequest() error
 }
 
 // FootballDataOrgClient is a client for football-data.org rest API
 type footballDataOrgClient struct {
-	config ffconfig.FFConfiguration
-	cache  storage.TeamsCacheClient
-	teams  []m.Team
+	config              ffconfig.FFConfiguration
+	cache               storage.TeamsCacheClient
+	teams               []m.Team
+	requestsAvailable   int
+	requestCounterReset int
+	lastRequest         time.Time
 }
 
 const (
+	// Request constants
 	xAuthToken       = "X-Auth-Token"
 	xResponseControl = "X-Response-Control"
 	api              = "https://api.football-data.org"
 	apiVersion       = "v1"
+	// Response constants
+	xRequestCounterReset = "X-Requestcounter-Reset"
+	xRequestsAvailable   = "X-Requests-Available"
+	date                 = "Date"
 )
 
 // End points for football-data.org
@@ -59,7 +70,13 @@ var fdoEndPoints = map[string]string{
 
 // NewFootballDataOrgClient creates a new FootballClient which uses football-data.org API
 func NewFootballDataOrgClient(config ffconfig.FFConfiguration, cache storage.TeamsCacheClient) FootballClient {
-	return footballDataOrgClient{config: config, cache: cache}
+	return footballDataOrgClient{
+		config:              config,
+		cache:               cache,
+		lastRequest:         time.Time{},
+		requestCounterReset: 0,
+		requestsAvailable:   0,
+	}
 }
 
 func (fbClient footballDataOrgClient) GetTeams() (teams []m.Team, err error) {
@@ -108,16 +125,38 @@ func (fbClient footballDataOrgClient) getTeamsInCompetition(competitionID int) [
 	return competitionResponse.Teams
 }
 
-func (fbClient footballDataOrgClient) makeMinifiedRequest(endPoint string, values map[string]string, unmarshalTo interface{}) {
-	fbClient.makeRequest(endPoint, "minified", values, unmarshalTo)
+func (fbClient footballDataOrgClient) makeMinifiedRequest(endPoint string, values map[string]string, unmarshalTo interface{}) error {
+	return fbClient.makeRequest(endPoint, "minified", values, unmarshalTo)
 }
 
-func (fbClient footballDataOrgClient) makeRequest(endPoint string, responseControl string, values map[string]string, unmarshalTo interface{}) {
-	resp, _ := fbClient.sendRequest(endPoint, responseControl, values)
-	defer resp.Body.Close()
-	body, _ := ioutil.ReadAll(resp.Body)
+func (fbClient footballDataOrgClient) makeRequest(endPoint string, responseControl string, values map[string]string, unmarshalTo interface{}) error {
+	err := fbClient.CanMakeRequest()
+	if err != nil {
+		return err
+	}
 
-	json.Unmarshal(body, unmarshalTo)
+	resp, err := fbClient.sendRequest(endPoint, responseControl, values)
+
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(body, unmarshalTo)
+
+	if err != nil {
+		return err
+	}
+
+	fbClient.updateRequestRate(resp.Header)
+
+	return nil
 }
 
 func (fbClient footballDataOrgClient) sendRequest(endPoint string, responseControl string, values map[string]string) (*http.Response, error) {
@@ -128,6 +167,25 @@ func (fbClient footballDataOrgClient) sendRequest(endPoint string, responseContr
 	req.Header.Add(xResponseControl, responseControl)
 
 	return client.Do(req)
+}
+
+func (fbClient footballDataOrgClient) CanMakeRequest() error {
+	remainingSecs := requestTimeout(fbClient.lastRequest, fbClient.requestCounterReset)
+	if fbClient.requestsAvailable == 0 && remainingSecs > 0 {
+		return fmt.Errorf("Cannot make request, try again in %f seconds", remainingSecs)
+	}
+	return nil
+}
+
+func requestTimeout(lastReqTime time.Time, reqReset int) float64 {
+	resetTime := lastReqTime.Add(time.Second * time.Duration(reqReset))
+	return -time.Since(resetTime).Seconds()
+}
+
+func (fbClient footballDataOrgClient) updateRequestRate(headers map[string][]string) {
+	fbClient.lastRequest = time.Now()
+	fbClient.requestCounterReset, _ = strconv.Atoi(headers[xRequestCounterReset][0])
+	fbClient.requestsAvailable, _ = strconv.Atoi(headers[xRequestsAvailable][0])
 }
 
 func buildRequestURL(endpoint string, values map[string]string) string {
