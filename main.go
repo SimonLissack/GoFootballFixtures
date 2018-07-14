@@ -55,7 +55,11 @@ func main() {
 	// Get fixtures for the team
 	fixtures := client.GetFixtures(teamID)
 
-	printHomeFixtures(fixtures, teamID)
+	if len(fixtures) == 0 {
+		fmt.Println("No upcoming matches for", teamName)
+	} else {
+		printHomeFixtures(fixtures, teamID)
+	}
 }
 
 func lookupTeam(teams []m.Team, teamQuery string) (int, error) {
