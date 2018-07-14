@@ -47,7 +47,9 @@ func main() {
 	if teamID == -1 {
 		teams, _ := client.GetTeams()
 		teamID, err = lookupTeam(teams, teamName)
-		logFatal(err)
+		if err != nil {
+			logFatal(err)
+		}
 	}
 
 	// Get fixtures for the team
